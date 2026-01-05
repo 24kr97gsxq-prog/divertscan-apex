@@ -1,0 +1,68 @@
+{
+  "name": "divertscan-apex-enterprise",
+  "version": "3.0.0",
+  "description": "DivertScan™ Apex Enterprise SaaS - LEED v5 Waste Management Platform",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
+    "lint:fix": "eslint . --ext ts,tsx --fix",
+    "backend:dev": "uvicorn src.backend.main:app --reload --host 0.0.0.0 --port 8000",
+    "backend:prod": "gunicorn src.backend.main:app -w 4 -k uvicorn.workers.UvicornWorker -b 0.0.0.0:8000",
+    "test": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "test:ui": "vitest --ui",
+    "typecheck": "tsc --noEmit",
+    "db:migrate": "psql $DATABASE_URL -f database/schema.sql",
+    "docker:dev": "docker-compose up -d",
+    "docker:prod": "docker-compose --profile production up -d",
+    "docker:down": "docker-compose down"
+  },
+  "dependencies": {
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-router-dom": "^6.26.0",
+    "idb": "^8.0.0",
+    "uuid": "^10.0.0",
+    "recharts": "^2.12.7",
+    "date-fns": "^3.6.0",
+    "lucide-react": "^0.436.0"
+  },
+  "devDependencies": {
+    "@testing-library/jest-dom": "^6.5.0",
+    "@testing-library/react": "^16.0.1",
+    "@testing-library/user-event": "^14.5.2",
+    "@types/node": "^22.5.4",
+    "@types/react": "^18.3.4",
+    "@types/react-dom": "^18.3.0",
+    "@types/uuid": "^10.0.0",
+    "@typescript-eslint/eslint-plugin": "^8.2.0",
+    "@typescript-eslint/parser": "^8.2.0",
+    "@vitejs/plugin-react": "^4.3.1",
+    "@vitest/coverage-v8": "^2.0.5",
+    "@vitest/ui": "^2.0.5",
+    "autoprefixer": "^10.4.20",
+    "eslint": "^9.9.0",
+    "eslint-plugin-react-hooks": "^5.1.0-rc.0",
+    "eslint-plugin-react-refresh": "^0.4.11",
+    "jsdom": "^25.0.0",
+    "postcss": "^8.4.41",
+    "tailwindcss": "^3.4.10",
+    "typescript": "^5.5.4",
+    "vite": "^5.4.2",
+    "vite-plugin-pwa": "^0.20.1",
+    "vitest": "^2.0.5"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/divertscan/apex-enterprise.git"
+  },
+  "author": "Dalmex Recycling LLC",
+  "license": "PROPRIETARY",
+  "private": true
+}

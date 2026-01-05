@@ -1,0 +1,165 @@
+# ═══════════════════════════════════════════════════════════════════════════════
+# DivertScan™ Apex Enterprise - Docker Compose
+# Full Stack Development & Production Configuration
+# ═══════════════════════════════════════════════════════════════════════════════
+
+version: '3.8'
+
+services:
+  # ───────────────────────────────────────────────────────────────────────────
+  # PostgreSQL Database
+  # ───────────────────────────────────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: divertscan-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: divertscan
+      POSTGRES_USER: divertscan
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-divertscan_dev_password}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U divertscan"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ───────────────────────────────────────────────────────────────────────────
+  # Redis Cache & Queue
+  # ───────────────────────────────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: divertscan-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ───────────────────────────────────────────────────────────────────────────
+  # Backend API (Development)
+  # ───────────────────────────────────────────────────────────────────────────
+  api:
+    build:
+      context: .
+      target: development
+    container_name: divertscan-api
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://divertscan:${DB_PASSWORD:-divertscan_dev_password}@postgres:5432/divertscan
+      REDIS_URL: redis://redis:6379/0
+      JWT_SECRET: ${JWT_SECRET:-dev-jwt-secret-change-in-production}
+      
+      # QuickBooks
+      QBO_CLIENT_ID: ${QBO_CLIENT_ID}
+      QBO_CLIENT_SECRET: ${QBO_CLIENT_SECRET}
+      QBO_ENVIRONMENT: ${QBO_ENVIRONMENT:-sandbox}
+      
+      # Twilio
+      TWILIO_ACCOUNT_SID: ${TWILIO_ACCOUNT_SID}
+      TWILIO_AUTH_TOKEN: ${TWILIO_AUTH_TOKEN}
+      TWILIO_PHONE_NUMBER: ${TWILIO_PHONE_NUMBER}
+      
+      # AI/OCR
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      
+      # Stripe
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY}
+      
+      # Storage
+      R2_ACCOUNT_ID: ${R2_ACCOUNT_ID}
+      R2_ACCESS_KEY_ID: ${R2_ACCESS_KEY_ID}
+      R2_SECRET_ACCESS_KEY: ${R2_SECRET_ACCESS_KEY}
+      R2_BUCKET_NAME: ${R2_BUCKET_NAME:-divertscan-dev}
+    volumes:
+      - ./src/backend:/app/src/backend:ro
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ───────────────────────────────────────────────────────────────────────────
+  # Frontend Development Server
+  # ───────────────────────────────────────────────────────────────────────────
+  frontend:
+    image: node:20-alpine
+    container_name: divertscan-frontend
+    working_dir: /app
+    command: sh -c "npm install && npm run dev -- --host"
+    volumes:
+      - .:/app
+      - node_modules:/app/node_modules
+    ports:
+      - "5173:5173"
+    environment:
+      VITE_API_URL: http://localhost:8000
+    depends_on:
+      - api
+
+  # ───────────────────────────────────────────────────────────────────────────
+  # Background Worker (Celery)
+  # ───────────────────────────────────────────────────────────────────────────
+  worker:
+    build:
+      context: .
+      target: development
+    container_name: divertscan-worker
+    command: celery -A src.backend.tasks worker --loglevel=info
+    environment:
+      DATABASE_URL: postgresql://divertscan:${DB_PASSWORD:-divertscan_dev_password}@postgres:5432/divertscan
+      REDIS_URL: redis://redis:6379/0
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+    volumes:
+      - ./src/backend:/app/src/backend:ro
+    depends_on:
+      - postgres
+      - redis
+    profiles:
+      - full
+
+  # ───────────────────────────────────────────────────────────────────────────
+  # Nginx (Production Only)
+  # ───────────────────────────────────────────────────────────────────────────
+  nginx:
+    image: nginx:alpine
+    container_name: divertscan-nginx
+    restart: unless-stopped
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./dist:/usr/share/nginx/html:ro
+    ports:
+      - "80:80"
+      - "443:443"
+    depends_on:
+      - api
+    profiles:
+      - production
+
+volumes:
+  postgres_data:
+  redis_data:
+  node_modules:
+
+networks:
+  default:
+    name: divertscan-network
